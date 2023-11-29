@@ -195,7 +195,7 @@ def run(klipper_folder, kconfig, port=7055):
       print(e, file=sys.stderr)
 
   app['kconf'] = kconf
-  app['config_filename'] = kconf
+  app['config_filename'] = config_filename
 
   web.run_app(app, port=port)
   logging.info('Stopping http server...\n')
