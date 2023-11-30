@@ -3,6 +3,7 @@
 # -*- coding: utf-8 -*-
 
 from aiohttp import web, WSMsgType
+from subprocess import PIPE, Popen, STDOUT
 
 import logging
 import json
@@ -108,7 +109,7 @@ def parse_menuconfig(node, indent):
     return nodes
 
 
-def get_menuconfig_noded(kconf):
+def get_menuconfig_nodes(kconf):
     data = {'title': kconf.mainmenu_text}
 
     nodes = parse_menuconfig(kconf.top_node.list, 0)
@@ -116,15 +117,26 @@ def get_menuconfig_noded(kconf):
     return data
 
 
-async def handle_post(request):
-  data = await request.post()
-  print(data)
+async def process_submit(ws, app, cmd):
+  print('processing submit', cmd)
+  klipper_folder = app['klipper_folder']
+  command = 'make'
+  if cmd == 'clean':
+    command += ' clean'
 
-  kconf = request.app['kconf']
-  config_filename = request.app['config_filename']
-  kconf.write_config(config_filename)
+  with Popen(command, cwd=klipper_folder, shell=True, stdout=PIPE, stderr=STDOUT, bufsize=1) as sp:
+    for line in sp.stdout:
+      text = line.decode('utf-8')
+      if text.strip().startswith('Creating hex file'):
+        filename = text.strip().split()[-1]
+        app['filename'] = filename
+        print('got filename:', filename)
+        await ws.send_str(f'{{"file": "{filename}"}}')
+      data = {'text': text}
+      await ws.send_str(json.dumps(data));
 
-  return web.FileResponse("index.html", chunk_size=256 * 1024)
+  await ws.send_str('{"text": "process finished"}')
+  await ws.send_str('{"text": ""}')
 
 
 async def handle_ws(request):
@@ -135,15 +147,13 @@ async def handle_ws(request):
     if msg.type == WSMsgType.TEXT:
       print(msg.data)
 
-      if msg.data == 'close':
-        await ws.close()
-        return ws
-
       kconf = request.app['kconf']
 
       if msg.data == 'init':
         pass
-      else:
+
+      elif msg.data.startswith('{'):
+        kconf = request.app['kconf']
         command = json.loads(msg.data)
         if 'option' in command:
           cmd = command['option']
@@ -155,7 +165,14 @@ async def handle_ws(request):
             if key in kconf.syms or key in kconf.named_choices:
               kconf.syms[key].set_value(command[key])
 
-      data = get_menuconfig_noded(kconf)
+      else:
+        config_filename = request.app['config_filename']
+        kconf.write_config(config_filename)
+        await process_submit(ws, request.app, msg.data)
+        continue
+
+      kconf = request.app['kconf']
+      data = get_menuconfig_nodes(kconf)
       await ws.send_str(json.dumps(data))
     elif msg.type == WSMsgType.ERROR:
       print('ws connection closed with exception %s' %
@@ -170,6 +187,19 @@ async def handle_index(request: web.Request) -> web.StreamResponse:
   return web.FileResponse("index.html", chunk_size=256 * 1024)
 
 
+async def handle_download(request: web.Request) -> web.StreamResponse:
+  klipper_folder = request.app['klipper_folder']
+  filename = request.app['filename']
+  file_path = os.path.join(klipper_folder, filename)
+  if os.path.exists(file_path):
+    response = web.FileResponse(file_path, chunk_size=256 * 1024)
+    fname = filename.split('/')[-1]
+    response.headers['Content-Disposition'] = f'attachment; filename="{fname}"';
+    return response
+  else:
+    raise web.HTTPNotFound
+
+
 def run(klipper_folder, kconfig, port=7055):
   logging.basicConfig(level=logging.INFO)
 
@@ -178,10 +208,10 @@ def run(klipper_folder, kconfig, port=7055):
     [
       web.get("/", handle_index),
       web.get("//", handle_index),
-      web.post("/", handle_post),
-      web.post("//", handle_post),
-      web.get("/ws", handle_ws),
-      web.get("//ws", handle_ws),
+      web.get("/download", handle_download),
+      web.get("//download", handle_download),
+      web.get("/menuconfig_ws", handle_ws),
+      web.get("//menuconfig_ws", handle_ws),
     ]
   )
 
@@ -196,6 +226,7 @@ def run(klipper_folder, kconfig, port=7055):
 
   app['kconf'] = kconf
   app['config_filename'] = config_filename
+  app['klipper_folder'] = klipper_folder
 
   web.run_app(app, port=port)
   logging.info('Stopping http server...\n')

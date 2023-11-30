@@ -11,6 +11,7 @@
 <script>
 
 var websocket;
+var fileName = '';
 
 function createHtml(html) {
   const template = document.createElement('template');
@@ -108,17 +109,29 @@ function parseOptions(parent, options) {
 
 function onLoad() {
   console.log("LOADED");
-  websocket = new WebSocket("ws://" + location.host + "/ws");
+  websocket = new WebSocket((location.protocol == 'https:' ? "wss://" : "ws://") + location.host + "/menuconfig_ws");
   websocket.onopen = (event) => {
     websocket.send("init");
   };
   websocket.onmessage = (event) => {
     const msg = JSON.parse(event.data);
-    console.log(msg);
-    const dynamicNode = document.getElementById("dynamic");
-    dynamicNode.textContent = '';
-    document.getElementById("menuTitle").innerHTML = msg.title;
-    parseOptions(dynamicNode, msg.options);
+//    console.log(msg);
+    if ('title' in msg) {
+      console.log('process nodes');
+      const dynamicNode = document.getElementById("dynamic");
+      dynamicNode.textContent = '';
+      document.getElementById("menuTitle").innerHTML = msg.title;
+      parseOptions(dynamicNode, msg.options);
+    } else if ('file' in msg) {
+      fileName = msg.file;
+      btn = document.getElementById("downloadButton")
+      btn.removeAttribute("hidden")
+    } else {
+      console.log('process message');
+      const logs = document.getElementById("compile_logs");
+      logs.innerHTML += msg.text + '<br>';
+      logs.scrollTop = logs.scrollHeight;
+    }
   }
 }
 function onChanged(item) {
@@ -164,12 +177,25 @@ function onChanged(item) {
   }
   websocket.send(JSON.stringify(data));
 }
-function formChanged(form) {
-  console.log('form changed');
-  let data = new FormData(form);
-  for (let entry of data) {
-    console.log(entry);
+function formSubmit(cmd, button) {
+  console.log('submit form');
+  websocket.send(cmd);
+  btn = document.getElementById("downloadButton");
+  btn.hidden = true;
+}
+function downloadFile() {
+  console.log(fileName);
+  let url = window.location.href;
+  if (url.endsWith('/download')) {
+
+  } else {
+    if (url.endsWith('/')) {
+      url += 'download';
+    } else {
+      url += '/download';
+    }
   }
+  window.location.href = url;
 }
 </script>
 <body onload="onLoad()">
@@ -177,14 +203,16 @@ function formChanged(form) {
 <div class="alert alert-primary" role="alert" id="menuTitle">
   A simple primary alert—check it out!
 </div>
-<form method="POST" enctype="multipart/form-data" onchange="formChanged(this)"> 
 <div id="dynamic">
 </div>
 <br>
 <div class="form-group">
-<button type="submit" class="btn btn-primary">Submit</button>
+<button type="button" class="btn btn-primary" onclick="formSubmit('submit')">Make</button>
+<button type="button" class="btn btn-warning" onclick="formSubmit('clean')">Clean</button>
+<button id="downloadButton" type="button" class="btn btn-success" onclick="downloadFile()" hidden>Download</button>
 </div>
-</form>
+<div id="compile_logs" style="font-family:monospace; overflow-y:scroll; width:100%; height:600px" class="container-fluid">
+</div>
 </div>
 </body>
 </html>
