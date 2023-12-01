@@ -5,6 +5,11 @@
 from aiohttp import web, WSMsgType
 from subprocess import PIPE, Popen, STDOUT
 
+from logging.handlers import RotatingFileHandler
+
+import sys
+
+import argparse
 import logging
 import json
 import os
@@ -16,12 +21,16 @@ from kconfiglib import Kconfig, \
                        TRI_TO_STR
 
 
-def indent_print(s, indent):
-    print(indent*" " + s)
+logging.basicConfig(
+    handlers=[logging.StreamHandler(sys.stdout)],
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def get_option_value(sc):
-
     item = {}
 
     if sc.type == STRING:
@@ -118,7 +127,7 @@ def get_menuconfig_nodes(kconf):
 
 
 async def process_submit(ws, app, cmd):
-  print('processing submit', cmd)
+  logger.info(f'processing submit: {cmd}')
   klipper_folder = app['klipper_folder']
   command = 'make'
   if cmd == 'clean':
@@ -130,7 +139,7 @@ async def process_submit(ws, app, cmd):
       if text.strip().startswith('Creating hex file'):
         filename = text.strip().split()[-1]
         app['filename'] = filename
-        print('got filename:', filename)
+        logger.info(f'got filename: {filename}')
         await ws.send_str(f'{{"file": "{filename}"}}')
       data = {'text': text}
       await ws.send_str(json.dumps(data));
@@ -175,10 +184,10 @@ async def handle_ws(request):
       data = get_menuconfig_nodes(kconf)
       await ws.send_str(json.dumps(data))
     elif msg.type == WSMsgType.ERROR:
-      print('ws connection closed with exception %s' %
+      logger.warning('ws connection closed with exception %s' %
             ws.exception())
 
-  print('websocket connection closed')
+  logger.warning('websocket connection closed')
 
   return ws
 
@@ -201,8 +210,6 @@ async def handle_download(request: web.Request) -> web.StreamResponse:
 
 
 def run(klipper_folder, kconfig, port=7055):
-  logging.basicConfig(level=logging.INFO)
-
   app = web.Application()
   app.add_routes(
     [
@@ -229,28 +236,55 @@ def run(klipper_folder, kconfig, port=7055):
   app['klipper_folder'] = klipper_folder
 
   web.run_app(app, port=port)
-  logging.info('Stopping http server...\n')
+  logger.info('Stopping http server...\n')
 
 
 if __name__ == '__main__':
-  from sys import argv
+  parser = argparse.ArgumentParser(description="Moonraker Telegram Bot")
+  parser.add_argument(
+      "-k",
+      "--klipperdir",
+      default="~/klipper",
+      metavar="<klipperdir>",
+      help="Location of klipper directory",
+  )
+  parser.add_argument(
+      "-l",
+      "--logfile",
+      metavar="<logfile>",
+      help="Location of server log file",
+  )
+  parser.add_argument(
+      "-p",
+      "--port",
+      default=7055,
+      type=int,
+      metavar="<port>",
+      help="Location of server log file",
+  )
+  system_args = parser.parse_args()
 
-  if len(argv) == 1:
-    print('No klipper folder argument found!')
+  klipper_folder = system_args.klipperdir
+  if len(klipper_folder) == 0 or not os.path.exists(klipper_folder):
+    logger.error('klipper folder not found!')
     exit()
 
-  klipper_folder = argv[1]
   kconfig = os.path.join(klipper_folder, 'src/Kconfig')
   if not os.path.exists(kconfig):
-    print('Can\'t open Kconfig file')
+    logger.error('Can\'t open Kconfig file')
     exit()
+
+  rotatingHandler = RotatingFileHandler(
+      system_args.logfile,
+      maxBytes=26214400,
+      backupCount=0,
+  )
+  rotatingHandler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+  logger.addHandler(rotatingHandler)
 
   os.environ['srctree'] = klipper_folder
 
   try:
-    if len(argv) == 3:
-      run(klipper_folder, kconfig, port=int(argv[2]))
-    else:
-      run(klipper_folder, kconfig)
+    run(klipper_folder, kconfig, system_args.port)
   except KeyboardInterrupt:
     pass
