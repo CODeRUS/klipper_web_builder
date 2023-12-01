@@ -31,3 +31,7 @@ Check example: https://github.com/CODeRUS/klipper_web_builder/blob/master/script
 ## Demo 
 
 ![animation](https://coderus.openrepos.net/static/KFCB.gif)
+
+## Credits
+
+Using [Kconfiglib](https://github.com/ulfalizer/Kconfiglib) Python library by [ulfalizer](https://github.com/ulfalizer)
