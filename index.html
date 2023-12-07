@@ -67,9 +67,9 @@ function addNumberInput(name, title, value) {
 function addMenu(name, title, opts) {
   let node = createHtml(`<div class="form-check"><br>
 <p>
-  <a class="btn btn-primary collapsed" data-bs-toggle="collapse" href="#collapse${name}_ID" role="button" aria-expanded="false" aria-controls="collapse${name}_ID">${title}</a>
+  <a class="btn btn-primary" data-bs-toggle="collapse" href="#collapse${name}_ID" role="button" aria-expanded="false" aria-controls="collapse${name}_ID">${title}</a>
 </p>
-<div class="collapse" id="collapse${name}_ID" style="">
+<div class="collapse show" id="collapse${name}_ID" style="">
 </div></div>`)
 
   const collapse = node.getElementsByClassName('collapse')[0];
