@@ -21,7 +21,7 @@ Open `host_ip:7055` in your browser, or check below how to setup nginx to access
 
 ```
 cd ~/klipper_web_builder
-scripts/install.sh
+scripts/uninstall.sh
 ```
 
 ## Can i setup nginx?
