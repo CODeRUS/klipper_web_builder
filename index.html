@@ -37,7 +37,7 @@ function addSelect(name, title, opts) {
   }
   return createHtml(`<div class="form-check">
 <label class="my-1 mr-2" for="select${name}_ID">${title}</label>
-<select class="form-control" id="select${name}_ID" name="option" onchange="onChanged(this)">
+<select class="form-select" id="select${name}_ID" name="option" onchange="onChanged(this)">
 ${options}
 </select>
 </div>`)
@@ -198,7 +198,7 @@ function downloadFile() {
   window.location.href = url;
 }
 </script>
-<body onload="onLoad()">
+<body class="p-4" onload="onLoad()">
 <div style="font-family:monospace" class="container-fluid">
 <div class="alert alert-primary" role="alert" id="menuTitle">
   A simple primary alert—check it out!

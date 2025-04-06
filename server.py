@@ -17,8 +17,7 @@ import os
 from kconfiglib import Kconfig, \
                        Symbol, MENU, COMMENT, \
                        BOOL, TRISTATE, STRING, INT, HEX, UNKNOWN, \
-                       expr_value, \
-                       TRI_TO_STR
+                       expr_value
 
 
 logging.basicConfig(
