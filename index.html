@@ -122,6 +122,15 @@ function onLoad() {
       dynamicNode.textContent = '';
       document.getElementById("menuTitle").innerHTML = msg.title;
       parseOptions(dynamicNode, msg.options);
+    } else if ('configs' in msg) {
+      console.log(JSON.stringify(msg.configs, null, 2));
+      const select_configs = document.getElementById("select_configs");
+      select_configs.innerHTML = '<option value=".config" selected>Klipper current</option>';
+      for (const it in msg.configs) {
+        const item = msg.configs[it]
+        select_configs.innerHTML += `<option value="${item}">${item}</option>`
+      }
+      select_configs.disabled = false;
     } else if ('file' in msg) {
       fileName = msg.file;
       btn = document.getElementById("downloadButton")
@@ -133,6 +142,10 @@ function onLoad() {
       logs.scrollTop = logs.scrollHeight;
     }
   }
+}
+function configChanged(item) {
+  console.log("config changed", item.value);
+  websocket.send(`kconf:${item.value}`);
 }
 function onChanged(item) {
   if (!item.name) {
@@ -201,7 +214,13 @@ function downloadFile() {
 <body class="p-4" onload="onLoad()">
 <div style="font-family:monospace" class="container-fluid">
 <div class="alert alert-primary" role="alert" id="menuTitle">
-  A simple primary alert—check it out!
+  Klipper menuconfig
+</div>
+<div class="form-check pb-4">
+  <label class="my-1 mr-2" for="select_configs">Firmware config file</label>
+  <select class="form-select" id="select_configs" name="option" onchange="configChanged(this)" disabled>
+    <option value="default" selected>Klipper current</option>
+  </select>
 </div>
 <div id="dynamic">
 </div>
